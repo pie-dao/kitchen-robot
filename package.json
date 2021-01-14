@@ -21,6 +21,8 @@
   "dependencies": {
     "@pie-dao/abis": "^1.0.0",
     "bignumber.js": "^9.0.1",
+    "blessed": "^0.1.81",
+    "blessed-contrib": "^4.8.21",
     "chalk": "^4.1.0",
     "cli-progress": "^3.8.2",
     "cli-table2": "^0.2.0",
