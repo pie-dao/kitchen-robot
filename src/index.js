@@ -1,22 +1,21 @@
 require('dotenv').config();
 
-/**
-* Charting Libs
-*/
 const blessed = require('blessed');
 const contrib = require('blessed-contrib');
-
-
 const chalk = require('chalk');
 const emoji = require('node-emoji-new')
 const cliProgress = require('cli-progress');
+const vorpal = require('vorpal')();
+
+
+const runDashboard = require('./ui/dashboard').run;
 const runOvenCheck = require('./routines/ovenBake').run;
 const ovenState = require('./routines/ovenBake').ovenState;
 const getPlotData = require('./routines/ovenBake').getPlotData;
 
 const { TokenSupplyCheck } = require('./checks/tokenSupply');
 const { Scheduler, Every } = require('./cronjobs');
-const vorpal = require('vorpal')();
+
 
 
 /**
@@ -60,6 +59,16 @@ vorpal
     
     screen.render()
 });
+
+
+
+vorpal
+.command('dashboard', 'Open dashboard.')
+.action(function(args, callback) {
+  runDashboard();
+  callback();
+});
+
 
 vorpal
 .command('oven-state', 'Outputs state of the ovens.')
