@@ -10,7 +10,7 @@ const discord = require('../apis/discord');
 
 const wallet = require('../wallet').wallet;
 const provider = require('../wallet').provider;
-const { on } = require('nodemon');
+const l = require('../classes/logger').logger;
 
 const MaxETHTranche = ethers.utils.parseEther("30");
 const ovens = [
@@ -82,49 +82,58 @@ const ovens = [
       }
   ]
 
+const getTime = () => {
+    const now = new Date();
+    return `${now.getHours()}:${now.getMinutes()}`;
+}
+
 let txInProgress  = {};
+let txs  = {
+};
 
 ovens.forEach(ov => {
     txInProgress[ov.addressOven] = false;
-})
-
+});
 
 async function checkOven(ov, execute=true) {    
-    const balance = await provider.getBalance(ov.addressOven) / 1e18;
-    const now = new Date();
-    ov.historicData.x.push(`${now.getHours()}:${now.getMinutes()}`);
-    ov.historicData.y.push(balance);
+    try {
+        const balance = await provider.getBalance(ov.addressOven) / 1e18;
+        ov.historicData.x.push(getTime());
+        ov.historicData.y.push(balance);
 
-    if(balance >= ov.minimum) {
-        //console.log(`Balance ${ov.name}: ${balance} ETH`);
+        if(balance >= ov.minimum) {
+            l.l(`Balance ${ov.name}: ${balance} ETH`);
 
-        let gasPrices = await gasNow.fetchGasPrice();
-        const table1 = new Table({ style: { head: [], border: [] } });
-        table1.push(['Rapid', 'Fast', 'Standard', 'Timestamp']);
-        table1.push([gasPrices.rapid, gasPrices.fast, gasPrices.standard, gasPrices.timestamp]);
-        //console.log(table1.toString())
+            let gasPrices = await gasNow.fetchGasPrice();
+            const table1 = new Table({ style: { head: [], border: [] } });
+            table1.push(['Rapid', 'Fast', 'Standard', 'Timestamp']);
+            table1.push([gasPrices.rapid, gasPrices.fast, gasPrices.standard, gasPrices.timestamp]);
+            //console.log(table1.toString())
 
-        if(txInProgress[ov.addressOven]) {
-            //console.log(chalk.red(`Tx still in progress: ${txInProgress[ov.addressOven]} \n`));
-            return;
-        }
+            if(txInProgress[ov.addressOven]) {
+                l.e(`Tx still in progress: ${txInProgress[ov.addressOven]} \n`);
+                return;
+            }
 
-        if(gasPrices.fast < 80000000000 && !ov.deprecated && txInProgress) {
-            await bake(
-                ov.addressOven,
-                3604155,
-                3, //Slippage
-                20, //max_addresses
-                1, //min_addresses
-                ethers.utils.parseEther("0.1"), // minAmount
-                execute, //execute
-                ov.baking.symbol
-            );
+            if(gasPrices.fast < 100000000000 && !ov.deprecated && txInProgress) {
+                await bake(
+                    ov.addressOven,
+                    3604155,
+                    3, //Slippage
+                    20, //max_addresses
+                    1, //min_addresses
+                    ethers.utils.parseEther("0.1"), // minAmount
+                    execute, //execute
+                    ov.baking.symbol
+                );
+            } else {
+                l.l('\n Gas price too high, checking again in a bit.\n')
+            }
         } else {
-            //console.log('\n Gas price too high, checking again in a bit.\n')
+            l.l(`${getTime()} ${ov.name}: ${balance} ETH`)
         }
-    } else {
-        //console.log(`${now} Balance ${ov.name}: ${balance} ETH`)
+    } catch (e) {
+        l.e(e.message);
     }
 }
 
@@ -136,6 +145,23 @@ function getPlotData() {
             y: ov.historicData.y,
             style: ov.historicData.style
         }
+    })
+}
+
+function getTxsData() {
+
+    let emojis = {
+        'Broadcasted': emoji.get('timer_clock'),
+        'Mined': emoji.get('check_mark_button'),
+        'Revert': emoji.get('cross_mark'),
+    }
+
+    return Object.keys(txs).map( hash => {
+        return [
+            txs[hash].time,
+            hash,
+            emojis[ txs[hash].status ]
+        ]
     })
 }
 
@@ -160,8 +186,8 @@ async function bake(
         const recipe_address = await oven.recipe();
         const recipe = new ethers.Contract(recipe_address, recipeABI, wallet);
 
-        //console.log("\tUsing pie @", pie_address);
-        //console.log("\n~Getting addresses~")
+        l.l("\tUsing pie @ " + pie_address);
+        l.l("\n~Getting addresses~")
         const deposits = await oven.queryFilter(oven.filters.Deposit(), start_block, "latest")
 
         const bar1 = new cliProgress.SingleBar({
@@ -181,15 +207,15 @@ async function bake(
             }
 
             if (balance.lt(minAmount)) {
-                //if(verbose)
-                    //console.log("Skipping", user,"(", balance.toString(), ")...")
+                if(verbose)
+                    l.l("Skipping", user,"(", balance.toString(), ")...")
                 
                 bar1.update(i+1);
                 continue
             }
 
-            //if(verbose)
-                //console.log("\nAdding", user, "(", balance.toString(), ")...")
+            if(verbose)
+                l.l("\nAdding", user, "(", balance.toString(), ")...")
 
             addresses.push(user)
 
@@ -202,7 +228,7 @@ async function bake(
             }
 
             if (addresses.length >= max_addresses) {
-                //console.log("\nMax addressess reached, continuing..\n")
+                l.l("\nMax addressess reached, continuing..\n")
                 bar1.update(deposits.length);
                 break
             }
@@ -211,13 +237,12 @@ async function bake(
         }
 
         if (addresses.length < min_addresses) {
-            //console.log(`\nAddressess is less than min_addresses\n`);
+            l.l(`\nAddressess is less than min_addresses\n`);
             return;
-            //throw new Error("Addressess is less than min_addresses")
         }
 
-        //console.log("\n~Done getting addresses~\n")
-        //console.log("Calculating output amount...")
+        l.l("\n~Done getting addresses~\n")
+        l.l("Calculating output amount...")
 
         let calculateFor = utils.parseEther("1");
 
@@ -225,8 +250,8 @@ async function bake(
         const outputAmount =  inputAmount.mul(calculateFor).div(etherJoinAmount).div(100).mul(100-slippage);
 
         
-        //console.log("Swapping", inputAmount.toString(), "for", outputAmount.toString())
-        //console.log("Start baking...")
+        l.l("Swapping", inputAmount.toString(), "for", outputAmount.toString())
+        l.l("Start baking...")
 
         const call = oven.interface.encodeFunctionData("bake", [addresses, outputAmount, inputAmount])
         //if(verbose)
@@ -252,12 +277,35 @@ async function bake(
             // });
 
         if(execute) {
+
+            const gas = await oven.estimateGas["bake(address[],uint256,uint256)"](
+                addresses,
+                outputAmount,
+                inputAmount,
+                overrides
+            );
+
+            const dryrun = await oven.callStatic["bake(address[],uint256,uint256)"](
+                addresses,
+                outputAmount,
+                inputAmount,
+                overrides
+            );
+
+            if(txInProgress[oven_address]) {
+                l.e(`Tx still in progress: ${txInProgress[oven_address]} \n`);
+                return;
+            }
+            
             const baketx = await oven["bake(address[],uint256,uint256)"](
                 addresses,
                 outputAmount,
                 inputAmount,
                 overrides
             );
+
+            l.l(`Estimated Gas: ${gas.toString()}`)
+            l.l(`Dry Run: ${dryrun.toString()}`)
 
             //if(verbose)
                 //console.log('baketx', baketx);
@@ -273,20 +321,25 @@ async function bake(
                 //console.log(message)
 
             txInProgress[oven_address] = `https://etherscan.io/tx/${baketx.hash}`;
-            //console.log('Tx Broadcasted: ', txInProgress[oven_address]);
+            
+            txs[baketx.hash] = {status: 'Broadcasted', time: getTime()};
+
+            l.l('Tx Broadcasted: ' + txInProgress[oven_address]);
             
             let receipt = await baketx.wait();
             if(receipt.status === 1) {
-                //console.log(`${chalk.green(`${emoji.get('check_mark_button')} ${baketx.hash} mined successully`)}`);
+                txs[baketx.hash] = {...txs[baketx.hash], status: 'Mined'};
+                l.l(`${emoji.get('check_mark_button')} ${baketx.hash} mined successully`);
             } else {
-                //console.log(`${chalk.red(`${emoji.get('cross_mark')} ${baketx.hash} failed`)}`);
+                l.e(`${emoji.get('cross_mark')} ${baketx.hash} failed`);
+                txs[baketx.hash] = {...txs[baketx.hash], status: 'Revert'};
             }
             txInProgress[oven_address] = false;
            
         }
 
     } catch (e) {
-        //console.log(e)
+        l.e(e.message);
     }
     
 }
@@ -298,22 +351,23 @@ async function run(execute=true) {
             await checkOven(ov, execute)
         }
     } catch(e) {
-        //console.log(e.message);
+        l.e(e.message);
     }
     //console.log('\n\n')
 }
 
 function ovenState() {
-    //console.log(chalk.yellow(`Baking State of Ovens`));
+    // l.l(chalk.yellow(`Baking State of Ovens`));
     const table1 = new Table({ style: { head: [], border: [] } });
     table1.push(ovens.map(o => o.name));
     table1.push(ovens.map(o => txInProgress[o.addressOven]));
-    //console.log(table1.toString());  
+    // l.l(table1.toString());
 };
 
 
 module.exports = {
     run,
     ovenState,
-    getPlotData
+    getPlotData,
+    getTxsData
 }

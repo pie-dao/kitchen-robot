@@ -15,7 +15,8 @@ const getPlotData = require('./routines/ovenBake').getPlotData;
 
 const { TokenSupplyCheck } = require('./checks/tokenSupply');
 const { Scheduler, Every } = require('./cronjobs');
-
+const l = require('./classes/logger').logger;
+const gasService = require('./classes/gasprice').gasService;
 
 
 /**
@@ -66,6 +67,7 @@ vorpal
 .command('dashboard', 'Open dashboard.')
 .action(function(args, callback) {
   runDashboard();
+  setupOvenChecks()
   callback();
 });
 
@@ -114,6 +116,8 @@ vorpal
 */
 async function setup() {
   console.log(`${chalk.white.bgMagenta(emoji.get('robot') + ' Welcome to the Kitchen Bot ' + emoji.get('robot'))} \n\n`);
+
+  setupGasChecks();
   
   if(process.env.RUN_SUPPLY_CHECKS === "true") {
     await setupSupplyChecks();
@@ -127,17 +131,21 @@ async function setup() {
   console.log(`${chalk.green(emoji.get('check_mark_button') + ' All gucci, bot is ready')}`);
   console.log('Type `help` to see command list \n\n')
   
-  if(process.env.RUN_OVEN_CHECKS  === "true") {
-    runOvenCheck();
-  }
-  
 }
 
 function setupOvenChecks() {
   console.log(chalk.magenta("Setting up OvenChecks..."))
-  scheduler.add(Every.second, runOvenCheck, 'RUN_OVEN_CHECKS');
+  scheduler.add(Every.minutes15, () => runOvenCheck(true), 'RUN_OVEN_CHECKS');
   console.log(chalk.white(`OvenChecks cronjob at: ${Every.minutes15} \n`));
 }
+
+function setupGasChecks() {
+  console.log(chalk.magenta("Setting up Gas price Checks..."))
+  scheduler.add(Every.minute, () => gasService.check(), 'RUN_GAS_CHECKS');
+  console.log(chalk.white(`GasChecks cronjob at: ${Every.minute} \n`));
+}
+
+
 
 async function setupSupplyChecks() {
   console.log(chalk.magenta("Setting up TokenSupplyCheck..."))
