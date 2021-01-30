@@ -177,6 +177,7 @@ async function bake(
     verbose = false
 ) {
     try {
+        txInProgress[oven_address] = 'Calculating';
         let addresses = []
         let { utils } = ethers;
         let inputAmount = ethers.BigNumber.from("0")
@@ -185,7 +186,7 @@ async function bake(
         const pie_address = await oven.pie();
         const recipe_address = await oven.recipe();
         const recipe = new ethers.Contract(recipe_address, recipeABI, wallet);
-
+        
         l.l("\tUsing pie @ " + pie_address);
         l.l("\n~Getting addresses~")
         const deposits = await oven.queryFilter(oven.filters.Deposit(), start_block, "latest")
@@ -292,7 +293,7 @@ async function bake(
                 overrides
             );
 
-            if(txInProgress[oven_address]) {
+            if(txInProgress[oven_address] !== false && txInProgress[oven_address] !== 'Calculating') {
                 l.e(`Tx still in progress: ${txInProgress[oven_address]} \n`);
                 return;
             }
@@ -339,6 +340,7 @@ async function bake(
         }
 
     } catch (e) {
+        txInProgress[oven_address] = false;
         l.e(e.message);
     }
     

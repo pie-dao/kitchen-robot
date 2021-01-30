@@ -135,7 +135,7 @@ async function setup() {
 
 function setupOvenChecks() {
   console.log(chalk.magenta("Setting up OvenChecks..."))
-  scheduler.add(Every.minutes15, () => runOvenCheck(true), 'RUN_OVEN_CHECKS');
+  scheduler.add(Every.minute, () => runOvenCheck(true), 'RUN_OVEN_CHECKS');
   console.log(chalk.white(`OvenChecks cronjob at: ${Every.minutes15} \n`));
 }
 
