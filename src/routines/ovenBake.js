@@ -95,6 +95,8 @@ ovens.forEach(ov => {
     txInProgress[ov.addressOven] = false;
 });
 
+const MAX_GAS = 105000000000;
+
 async function checkOven(ov, execute=true) {    
     try {
         const balance = await provider.getBalance(ov.addressOven) / 1e18;
@@ -115,7 +117,7 @@ async function checkOven(ov, execute=true) {
                 return;
             }
 
-            if(gasPrices.fast < 100000000000 && !ov.deprecated && txInProgress) {
+            if(gasPrices.fast < MAX_GAS && !ov.deprecated && txInProgress) {
                 await bake(
                     ov.addressOven,
                     3604155,
@@ -266,6 +268,10 @@ async function bake(
 
         if(gasPrices.fast) {
             overrides.gasPrice = gasPrices.fast;
+        }
+
+        if(gasPrices.fast > MAX_GAS) {
+            overrides.gasPrice = MAX_GAS;
         }
 
         //if(verbose)

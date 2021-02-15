@@ -146,7 +146,7 @@ function setupGasPrice() {
 function setupDivergencePeg() {
   widgets.peg = grid.set(6, 0, 6, 6, contrib.line, { 
     showNthLabel: 1,
-    maxY: 20,
+    maxY: 100,
     label: 'Oven State',
     showLegend: true,
     legend: {width: 10}
