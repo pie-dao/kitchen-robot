@@ -12,12 +12,16 @@ const runDashboard = require('./ui/dashboard').run;
 const runOvenCheck = require('./routines/ovenBake').run;
 const ovenState = require('./routines/ovenBake').ovenState;
 const getPlotData = require('./routines/ovenBake').getPlotData;
+const ethers = require('ethers');
 
 const { TokenSupplyCheck } = require('./checks/tokenSupply');
 const { Scheduler, Every } = require('./cronjobs');
 const l = require('./classes/logger').logger;
 const gasService = require('./classes/gasprice').gasService;
 
+const wallet = require('./wallet').wallet;
+
+const votingABI = require('./abis/votingDAO.json');
 
 /**
 * Config
@@ -77,6 +81,35 @@ vorpal
 .action(function(args, callback) {
   ovenState();
   scheduler.status('RUN_OVEN_CHECKS')
+  callback();
+});
+
+vorpal
+.command('votes', 'Outputs state of the ovens.')
+.action(async function(args, callback) {
+  
+  let voting = new ethers.Contract('0x109b588A4f2a234e302c722f91fe42c5ab828A32', votingABI, wallet);
+  let voting2 = new ethers.Contract('0x5246A163803A97d1fa046D85B722F5c51C728408', votingABI, wallet);
+  
+  const votes = await voting.queryFilter(voting.filters.CastVote(), 9593680, "latest")
+  const votes2 = await voting.queryFilter(voting2.filters.CastVote(), 11086737, "latest")
+
+  let addresses = [];
+  for( const [i, vote] of votes.entries()) {
+      const user = vote.args.voter;
+      console.log('user', user)
+      addresses.push(user)
+  }
+
+  for( const [i, vote] of votes2.entries()) {
+    const user = vote.args.voter;
+    console.log('user', user)
+    addresses.push(user)
+}
+
+  let uniqueItems = [...new Set(addresses)];
+  console.log(uniqueItems);
+
   callback();
 });
 
