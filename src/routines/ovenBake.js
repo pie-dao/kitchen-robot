@@ -95,7 +95,7 @@ ovens.forEach(ov => {
     txInProgress[ov.addressOven] = false;
 });
 
-const MAX_GAS = 105000000000;
+const MAX_GAS = 110000000000;
 
 async function checkOven(ov, execute=true) {    
     try {
@@ -263,8 +263,13 @@ async function bake(
         let gasPrices = await gasNow.fetchGasPrice();
 
         let overrides = {
-            gasLimit: 7000000
+            gasLimit: 9000000
         };
+
+        if( (inputAmount / 1e18) < 10 ) {
+            l.e(`Wrong Minimum: ${inputAmount / 1e18} ETH\n`);
+            return;
+        }
 
         if(gasPrices.fast) {
             overrides.gasPrice = gasPrices.fast;
@@ -273,15 +278,6 @@ async function bake(
         if(gasPrices.fast > MAX_GAS) {
             overrides.gasPrice = MAX_GAS;
         }
-
-        //if(verbose)
-            //console.log('Bake Session data', {
-            //     addresses,
-            //     outputAmount: outputAmount.toString(),
-            //     maxPrice: inputAmount.toString(),
-            //     gasPrices,
-            //     overrides
-            // });
 
         if(execute) {
 
