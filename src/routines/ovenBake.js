@@ -113,7 +113,7 @@ async function checkOven(ov, execute=true) {
             //console.log(table1.toString())
 
             if(txInProgress[ov.addressOven]) {
-                l.e(`Tx still in progress: ${txInProgress[ov.addressOven]} \n`);
+                //l.e(`Tx still in progress: ${txInProgress[ov.addressOven]} \n`);
                 return;
             }
 
@@ -122,7 +122,7 @@ async function checkOven(ov, execute=true) {
                     ov.addressOven,
                     3604155,
                     3, //Slippage
-                    20, //max_addresses
+                    100, //max_addresses
                     1, //min_addresses
                     ethers.utils.parseEther("0.1"), // minAmount
                     execute, //execute
@@ -210,6 +210,7 @@ async function bake(
             }
 
             if (balance.lt(minAmount)) {
+
                 if(verbose)
                     l.l("Skipping", user,"(", balance.toString(), ")...")
                 
@@ -279,21 +280,24 @@ async function bake(
             overrides.gasPrice = MAX_GAS;
         }
 
-        if(execute) {
+        const gas = await oven.estimateGas["bake(address[],uint256,uint256)"](
+            addresses,
+            outputAmount,
+            inputAmount,
+            overrides
+        );
 
-            const gas = await oven.estimateGas["bake(address[],uint256,uint256)"](
-                addresses,
-                outputAmount,
-                inputAmount,
-                overrides
-            );
+        const dryrun = await oven.callStatic["bake(address[],uint256,uint256)"](
+            addresses,
+            outputAmount,
+            inputAmount,
+            overrides
+        );
 
-            const dryrun = await oven.callStatic["bake(address[],uint256,uint256)"](
-                addresses,
-                outputAmount,
-                inputAmount,
-                overrides
-            );
+        l.l(`Estimated Gas: ${gas.toString()}`)
+        l.l(`Dry Run: ${dryrun.toString()}`)
+
+        if(execute === true) {
 
             if(txInProgress[oven_address] !== false && txInProgress[oven_address] !== 'Calculating') {
                 l.e(`Tx still in progress: ${txInProgress[oven_address]} \n`);
@@ -306,9 +310,6 @@ async function bake(
                 inputAmount,
                 overrides
             );
-
-            l.l(`Estimated Gas: ${gas.toString()}`)
-            l.l(`Dry Run: ${dryrun.toString()}`)
 
             //if(verbose)
                 //console.log('baketx', baketx);

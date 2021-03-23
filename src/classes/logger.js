@@ -8,9 +8,10 @@ class Logger extends PubSub {
         this.errors = [];
     }
 
-    l(log) {
-        this.logs.push(log);
-        super.publish('log', log);
+    l(log='', log2='', log3='', log4='') {
+        let l = `${log} ${log2} ${log3} ${log4}`;
+        this.logs.push(l);
+        super.publish('log', l);
     }
 
     e(log) {

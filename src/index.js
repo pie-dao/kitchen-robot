@@ -135,7 +135,16 @@ vorpal
 .command('oven-run-checks', 'Runs checks on the oven now.')
 .option('-no, --notx', 'Runs checks on the oven without exectuting the tx')
 .action(function(args, callback) {
-  runOvenCheck(args.options.notx ? false : true);
+  let execute = args.options.notx ? false : true;
+  console.log('execute', execute);
+  runOvenCheck(execute);
+  l.subscribe('log', (log) => {
+    console.log(log)
+  }, this);
+
+  l.subscribe('error', (log) => {
+    console.log(log)
+  }, this);
   callback();
 });
 
