@@ -17,6 +17,8 @@ const ethers = require('ethers');
 const { TokenSupplyCheck } = require('./checks/tokenSupply');
 const { Scheduler, Every } = require('./cronjobs');
 const l = require('./classes/logger').logger;
+
+const Oven = require('./classes/oven').Oven;
 const gasService = require('./classes/gasprice').gasService;
 
 const wallet = require('./wallet').wallet;
@@ -187,8 +189,6 @@ function setupGasChecks() {
   console.log(chalk.white(`GasChecks cronjob at: ${Every.minute} \n`));
 }
 
-
-
 async function setupSupplyChecks() {
   console.log(chalk.magenta("Setting up TokenSupplyCheck..."))
   const bar1 = new cliProgress.SingleBar({
@@ -212,4 +212,11 @@ async function setupSupplyChecks() {
   console.log(chalk.white(`TokenSupplyCheck cronjob at: ${Every.minute} \n`));
 }
 
-setup();
+async function test() {
+  let o = new Oven("0xb9Eef048dcc5F9CC453029cC2ed21f4a558ad0E8");
+  await o.sync();
+}
+
+test();
+// setup();
+
