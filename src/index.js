@@ -22,6 +22,7 @@ const gasService = require('./classes/gasprice').gasService;
 const wallet = require('./wallet').wallet;
 
 const votingABI = require('./abis/votingDAO.json');
+const ovenV2ABI = require('./abis/ovenV2.json');
 
 /**
 * Config
@@ -75,6 +76,50 @@ vorpal
   callback();
 });
 
+vorpal
+.command('ovenV2', '.')
+.action(async function(args, callback) {
+  
+  let ov = new ethers.Contract('0xb9eef048dcc5f9cc453029cc2ed21f4a558ad0e8', ovenV2ABI, wallet);
+  
+  const votes = await ov.queryFilter(ov.filters.Deposit(), 12091958, "latest")
+  const withdraws = await ov.queryFilter(ov.filters.Withdraw(), 12091958, "latest")
+
+  let addressDeposits = {};
+  for( const [i, deposit] of votes.entries()) {
+      const user = deposit.args.from;
+      const amount = deposit.args.amount;
+      if(addressDeposits[user]) {
+        addressDeposits[user] = addressDeposits[user].add(amount)
+      } else{
+        addressDeposits[user] = amount;
+      }
+  }
+
+  
+  
+
+  console.log(`\n\n withdraw \n\n`)
+  for( const [i, withdraw] of withdraws.entries()) {
+    const user = withdraw.args.from;
+    const amount = withdraw.args.inputAmount;
+    const isGood = withdraw.args.inputAmount.gt(0) ? 'OK' : 'ERR';
+    console.log(`${isGood}: ${user},${amount.toString()}`)
+    if(isGood) {
+      if(addressDeposits[user]) {
+        addressDeposits[user] = addressDeposits[user].sub(amount)
+      } else {
+        console.log('we have a problem', withdraw)
+      }
+    }
+  }
+
+  for (const [key, value] of Object.entries(addressDeposits)) {
+    console.log(`${key},${value/1e18}`);
+  }
+
+  callback();
+});
 
 vorpal
 .command('oven-state', 'Outputs state of the ovens.')
@@ -212,4 +257,4 @@ async function setupSupplyChecks() {
   console.log(chalk.white(`TokenSupplyCheck cronjob at: ${Every.minute} \n`));
 }
 
-setup();
+// setup();
