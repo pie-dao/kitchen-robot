@@ -213,7 +213,8 @@ async function setupSupplyChecks() {
 }
 
 async function test() {
-  let o = new Oven("0xb9Eef048dcc5F9CC453029cC2ed21f4a558ad0E8");
+  let o = new Oven("0x90Cc6F4ec7Aa0468D2eDb3F627AcD988B14A78b4");
+  await o.initialize();
   await o.sync();
 }
 
