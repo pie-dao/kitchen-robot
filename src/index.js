@@ -196,12 +196,15 @@ function setupGasChecks() {
 }
 
 async function setupOvenV2Checks() {
+  console.log(chalk.magenta("Setting up Oven V2 Checks..."))
+
   let o = new Oven("0x90Cc6F4ec7Aa0468D2eDb3F627AcD988B14A78b4");
   await o.initialize();
-
-  console.log(chalk.magenta("Setting up Oven V2 Checks..."))
+  
   scheduler.add(Every.minute, () => runOvenV2Check([o]), 'RUN_OVEN_V2_CHECKS');
   console.log(chalk.white(`Oven V2 cronjob at: ${Every.minute} \n`));
+
+  runOvenV2Check([o])
 }
 
 function setupGasChecks() {
@@ -233,5 +236,13 @@ async function setupSupplyChecks() {
   console.log(chalk.white(`TokenSupplyCheck cronjob at: ${Every.minute} \n`));
 }
 
-// setup();
+setup();
 
+async function test() {
+  console.log('test');
+  let o = new Oven("0x90Cc6F4ec7Aa0468D2eDb3F627AcD988B14A78b4");
+  await o.initialize();
+  await o.checkAndBake();
+}
+
+//test();

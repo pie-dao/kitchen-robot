@@ -47,7 +47,7 @@ class Oven {
     async checkAndBake() {
         await this.searchRoundsToBaked();
 
-        if( this.currentBakeSession.shouldBake ) 
+        if( !this.currentBakeSession.shouldBake ) 
             return;
         
         console.log('We have enough WETH: ', this.currentBakeSession.amount/1e18);
@@ -55,6 +55,11 @@ class Oven {
     }
 
     async dobake() {
+        console.log('dobake this.currentBakeSession.shouldBake', this.currentBakeSession.shouldBake)
+        if( !this.currentBakeSession.shouldBake ) 
+            return;
+        
+        console.log('We have enough WETH: ', this.currentBakeSession.amount/1e18);
         
         const res = await this.calcRecipe();
 
@@ -73,11 +78,12 @@ class Oven {
     }
 
     async calcRecipe() {
+        console.log('calcRecipe')
         // Calculate price for 1
         let price = await this.recipe.callStatic.getPrice(this.inputToken, this.outputToken, ethers.utils.parseEther("1"));
 
         //Calculate price + slippage
-        let pricePlusSlippage = price.mul(102).div(100)
+        let pricePlusSlippage = price.mul(105).div(100)
         console.log('price', (pricePlusSlippage/1e18).toString())
         console.log('price', (pricePlusSlippage).toString())
 
@@ -105,9 +111,11 @@ class Oven {
 
     async bake(args) {
         const {data, roundsIds, weiAdjusted} = args;
+        console.log('bake', {data, roundsIds, weiAdjusted});
         if(this.txInProgress()) {
             return false;
         }
+        console.log('tx is not in progress biatch');
 
         let staticCall = await this.instance.callStatic.bake(data, roundsIds, {
             gasLimit: "9500000"
@@ -115,7 +123,7 @@ class Oven {
 
         console.log('static call ok');
 
-        let tx = await this.instance.callStatic.bake(data, roundsIds, {
+        let tx = await this.instance.bake(data, roundsIds, {
             gasLimit: "9500000"
         });
 
@@ -139,7 +147,6 @@ class Oven {
 
     async getRounds() {
         this.rounds = await this.instance.getRounds();
-        console.log("rounds", this.rounds)
     }
 
     txInProgress() {
@@ -155,7 +162,8 @@ class Oven {
             return false;
         }
 
-        this.currentBakeSession.amount = ethers.BigNumber.from(0);
+        this.clearSession();
+
         await this.getRounds();
         let roundsToBeBaked = [];
         this.rounds.forEach( (round, index) => {
@@ -181,8 +189,11 @@ class Oven {
             }
         });
 
-        if( !this.currentBakeSession.amount.gte(this.minimum) ) 
+        if( this.currentBakeSession.amount.gte(this.minimum) )  {
             this.currentBakeSession.shouldBake = true;
+            console.log('yes we should')
+        }
+            
             
         this.currentBakeSession.rounds = roundsToBeBaked;
         console.log( 'Rounds to be baked: ', roundsToBeBaked.length )
