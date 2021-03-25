@@ -201,8 +201,8 @@ async function setupOvenV2Checks() {
   let o = new Oven("0x90Cc6F4ec7Aa0468D2eDb3F627AcD988B14A78b4");
   await o.initialize();
   
-  scheduler.add(Every.minute, () => runOvenV2Check([o]), 'RUN_OVEN_V2_CHECKS');
-  console.log(chalk.white(`Oven V2 cronjob at: ${Every.minute} \n`));
+  scheduler.add(Every.minutes15, () => runOvenV2Check([o]), 'RUN_OVEN_V2_CHECKS');
+  console.log(chalk.white(`Oven V2 cronjob at: ${Every.minutes15} \n`));
 
   runOvenV2Check([o])
 }
