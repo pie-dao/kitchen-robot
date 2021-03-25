@@ -10,6 +10,7 @@ const vorpal = require('vorpal')();
 
 const runDashboard = require('./ui/dashboard').run;
 const runOvenCheck = require('./routines/ovenBake').run;
+const runOvenV2Check = require('./routines/ovenV2Bake').run;
 const ovenState = require('./routines/ovenBake').ovenState;
 const getPlotData = require('./routines/ovenBake').getPlotData;
 const ethers = require('ethers');
@@ -163,12 +164,17 @@ async function setup() {
 
   setupGasChecks();
   
+  
   if(process.env.RUN_SUPPLY_CHECKS === "true") {
     await setupSupplyChecks();
   }
   
   if(process.env.RUN_OVEN_CHECKS  === "true") {
     setupOvenChecks();
+  }
+
+  if(process.env.RUN_OVEN_V2_CHECKS  === "true") {
+    await setupOvenV2Checks();
   }
   
   isReady = true;    
@@ -181,6 +187,21 @@ function setupOvenChecks() {
   console.log(chalk.magenta("Setting up OvenChecks..."))
   scheduler.add(Every.minute, () => runOvenCheck(true), 'RUN_OVEN_CHECKS');
   console.log(chalk.white(`OvenChecks cronjob at: ${Every.minutes15} \n`));
+}
+
+function setupGasChecks() {
+  console.log(chalk.magenta("Setting up Gas price Checks..."))
+  scheduler.add(Every.minute, () => gasService.check(), 'RUN_GAS_CHECKS');
+  console.log(chalk.white(`GasChecks cronjob at: ${Every.minute} \n`));
+}
+
+async function setupOvenV2Checks() {
+  let o = new Oven("0x90Cc6F4ec7Aa0468D2eDb3F627AcD988B14A78b4");
+  await o.initialize();
+
+  console.log(chalk.magenta("Setting up Oven V2 Checks..."))
+  scheduler.add(Every.minute, () => runOvenV2Check([o]), 'RUN_OVEN_V2_CHECKS');
+  console.log(chalk.white(`Oven V2 cronjob at: ${Every.minute} \n`));
 }
 
 function setupGasChecks() {
@@ -212,12 +233,5 @@ async function setupSupplyChecks() {
   console.log(chalk.white(`TokenSupplyCheck cronjob at: ${Every.minute} \n`));
 }
 
-async function test() {
-  let o = new Oven("0x90Cc6F4ec7Aa0468D2eDb3F627AcD988B14A78b4");
-  await o.initialize();
-  await o.sync();
-}
-
-test();
 // setup();
 
