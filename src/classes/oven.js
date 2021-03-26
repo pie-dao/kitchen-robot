@@ -9,11 +9,10 @@ const provider = require('../wallet').provider;
 const discord = require('../apis/discord');
 
 class Oven {
-    constructor(_address, _minimum = 10, _lastBakedRound = 0, _recipeAddress = '0x7811ec9801AA72EA3f3E4bb5AeceDBC134c44Af1') {
+    constructor(_address, _minimum = 10, _lastBakedRound = 0) {
         this.address = _address;
         this.ready = false;
         this.instance = new ethers.Contract(_address, ovenABI, wallet);
-        this.recipe = new ethers.Contract(_recipeAddress, recipeABI, provider);
         this.minimum = ethers.utils.parseEther(_minimum.toString());
         this.lastBakedRound = 0;
         this.currentBakeSession = {
@@ -28,6 +27,8 @@ class Oven {
         this.roundSizeInputAmount = await this.instance.roundSizeInputAmount();
         this.inputToken = await this.instance.inputToken();
         this.outputToken = await this.instance.outputToken();
+        this.recipeAddress = await this.instance.recipe();
+        this.recipe = new ethers.Contract(this.recipeAddress, recipeABI, provider);
         this.ready = true;
     }
 
@@ -54,7 +55,7 @@ class Oven {
         await this.dobake();
     }
 
-    async dobake() {
+    async dobake(gasPrices) {
         console.log('dobake this.currentBakeSession.shouldBake', this.currentBakeSession.shouldBake)
         if( !this.currentBakeSession.shouldBake ) 
             return;
@@ -64,7 +65,7 @@ class Oven {
         const res = await this.calcRecipe();
 
         console.log('res', res);
-        await this.bake(res);
+        await this.bake(res, gasPrices);
     }
 
     async notifyDiscord(amount, hash) {
@@ -90,7 +91,7 @@ class Oven {
         const roundsIds = this.currentBakeSession.rounds.map(v => v.id);
         console.log('Rounds ids:', roundsIds);
 
-        let amountToUse = this.currentBakeSession.amount.gt(this.roundSizeInputAmount) ? this.roundSizeInputAmount : this.currentBakeSession.amount;
+        let amountToUse = this.currentBakeSession.amount; //this.currentBakeSession.amount.gt(this.roundSizeInputAmount) ? this.roundSizeInputAmount : this.currentBakeSession.amount;
 
         let amountOfPie = amountToUse.div(pricePlusSlippage);
         let weiAdjusted = amountOfPie.mul( ethers.utils.parseEther("1") );
@@ -109,12 +110,20 @@ class Oven {
         }
     }
 
-    async bake(args) {
+    async bake(args, gasPrices) {
+
+        let WETH = new ethers.Contract(this.inputToken, erc20ABI, wallet);
+        let wethBalanceAfter = await WETH.balanceOf(this.address)
+        console.log('WETH Balance', wethBalanceAfter.toString(), wethBalanceAfter/1e18);
         const {data, roundsIds, weiAdjusted} = args;
+        console.log('gasPrices', gasPrices)
         console.log('bake', {data, roundsIds, weiAdjusted});
         if(this.txInProgress()) {
             return false;
         }
+        let wATRI = new ethers.Contract('0xf037f37f58110933834ca64545e4ffd169736561', erc20ABI, wallet);
+        let atriBalance = await wATRI.balanceOf(this.recipeAddress)
+        console.log('ATRI BALANCE BEFORE', atriBalance/1e18);
         console.log('tx is not in progress biatch');
 
         let staticCall = await this.instance.callStatic.bake(data, roundsIds, {
@@ -124,7 +133,8 @@ class Oven {
         console.log('static call ok');
 
         let tx = await this.instance.bake(data, roundsIds, {
-            gasLimit: "9500000"
+            gasLimit: "9500000",
+            gasPrice: gasPrices.fast
         });
 
         this.currentBakeSession.tx = tx;
@@ -137,6 +147,9 @@ class Oven {
             let WETH = new ethers.Contract(this.inputToken, erc20ABI, wallet);
             let pieBalanceAfter = await pie.balanceOf(this.address)
             let wethBalanceAfter = await WETH.balanceOf(this.address)
+            atriBalance = await wATRI.balanceOf(this.address)
+            
+            console.log('ATRI BALANCE AFTER', atriBalance/1e18);
             
             console.log('pieBalanceAfter', pieBalanceAfter/1e18);
             console.log('wethBalanceAfter', wethBalanceAfter/1e18);
@@ -164,30 +177,38 @@ class Oven {
 
         this.clearSession();
 
+        let WETH = new ethers.Contract(this.inputToken, erc20ABI, wallet);
+        let wethBalanceAfter = await WETH.balanceOf(this.address)
+        console.log('WETH Balance', wethBalanceAfter.toString(), wethBalanceAfter/1e18);
+
         await this.getRounds();
         let roundsToBeBaked = [];
-        this.rounds.forEach( (round, index) => {
+        for (const [index, round] of this.rounds.entries() ) {
             if (round.totalDeposited.gt(0) && round.totalBakedInput.lt(round.totalDeposited) ) {
-                roundsToBeBaked.push({
-                    ...round,
-                    id: index
-                });
                 console.log(`\n Round ${index} needs bakig ser\n`)
 
                 console.log('round.totalDeposited', round.totalDeposited/1e18)
                 console.log('round.totalBakedInput', round.totalBakedInput/1e18)
                 let amountToBake = round.totalDeposited.sub( round.totalBakedInput );
-                
                 console.log('amountToBake', amountToBake/1e18)
 
+                roundsToBeBaked.push({
+                    ...round,
+                    id: index
+                });
                 this.currentBakeSession.amount = this.currentBakeSession.amount.add( amountToBake );
+
+                if( this.currentBakeSession.amount.gt(this.roundSizeInputAmount) )
+                    break;
             }
 
             if (round.totalBakedInput.eq(round.totalDeposited) ) {
                 this.lastBakedRound = index;
                 console.log('last baked round was', index)
             }
-        });
+        }
+
+        
 
         if( this.currentBakeSession.amount.gte(this.minimum) )  {
             this.currentBakeSession.shouldBake = true;
@@ -196,6 +217,7 @@ class Oven {
             
             
         this.currentBakeSession.rounds = roundsToBeBaked;
+        console.log( 'Rounds to be baked: ', roundsToBeBaked )
         console.log( 'Rounds to be baked: ', roundsToBeBaked.length )
     }
 

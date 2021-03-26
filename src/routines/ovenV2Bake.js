@@ -2,7 +2,7 @@ const Table = require('cli-table2');
 const gasNow = require('../apis/gasnow');  
 const l = require('../classes/logger').logger;
 
-const MAX_GAS = 510000000000;
+const MAX_GAS = 210000000000;
 let fullCycleDone = true;
 
 async function checkOven(ov) {    
@@ -20,7 +20,7 @@ async function checkOven(ov) {
 
             if(gasPrices.fast < MAX_GAS) {
                 console.log("gas is cool")
-                let baketx = await ov.dobake();
+                let baketx = await ov.dobake(gasPrices);
             } else {
                 console.log('\n Gas price too high, checking again in a bit.\n');
             }
