@@ -25,6 +25,7 @@ const gasService = require('./classes/gasprice').gasService;
 const wallet = require('./wallet').wallet;
 
 const votingABI = require('./abis/votingDAO.json');
+const ovenV2ABI = require('./abis/ovenV2.json');
 
 /**
 * Config
@@ -78,6 +79,72 @@ vorpal
   callback();
 });
 
+vorpal
+.command('oven-rescue', '.')
+.action(async function(args, callback) {
+  
+  let ov = new ethers.Contract('0x90Cc6F4ec7Aa0468D2eDb3F627AcD988B14A78b4', ovenV2ABI, wallet);
+  
+  const deposits = await ov.queryFilter(ov.filters.Deposit(), 12091958, "latest")
+  const withdraws = await ov.queryFilter(ov.filters.Withdraw(), 12091958, "latest")
+
+  let addressDeposits = {};
+  for( const [i, deposit] of deposits.entries()) {
+      const user = deposit.args.from;
+      const amount = deposit.args.amount;
+      if(addressDeposits[user]) {
+        addressDeposits[user] = addressDeposits[user].add(amount)
+      } else{
+        addressDeposits[user] = amount;
+      }
+  }
+
+  // for (const [key, value] of Object.entries(addressDeposits)) {
+  //   const pieAmount = await ov.outputBalanceOf(key);
+  //   console.log(`${key},${value/1e18}, ${(pieAmount/1e18)}`);
+  // }
+
+
+  console.log(`\n\n withdraw \n\n`)
+
+  console.log(`tx,user,ethAmount,pieAmount`);
+  for( const [i, withdraw] of withdraws.entries()) {
+
+    const user = withdraw.args.from;
+    const amount = withdraw.args.inputAmount;
+    const outputAmount = withdraw.args.outputAmount;
+    const isGood = withdraw.args.inputAmount.gt(0) ? 'OK' : 'ERR';
+
+    // console.log(`https://etherscan.io/tx/${withdraw.transactionHash},${user},${amount/1e18},${outputAmount/1e18}`)
+    // console.log('tx', withdraw.transactionHash)
+    // console.log('user', user)
+    // console.log('amount', amount / 1e18)
+    // console.log('outputAmount', outputAmount / 1e18)
+    // console.log(`${isGood}: ${user},${amount.toString()}`)
+
+    if(isGood) {
+      if(addressDeposits[user]) {
+        addressDeposits[user] = addressDeposits[user].sub(amount)
+      } else {
+        console.log('we have a problem', withdraw)
+      }
+    }
+  }
+
+  let total = 0;
+  let t = ethers.BigNumber.from(0);
+  let a = ethers.BigNumber.from(10);
+  console.log(t)
+  t.add( a )
+  console.log(t.toString())
+  for (const [key, value] of Object.entries(addressDeposits)) {
+    console.log(`${key},${value/1e18}`);
+  }
+
+  console.log('total', total)
+
+  callback();
+});
 
 vorpal
 .command('oven-state', 'Outputs state of the ovens.')
@@ -236,7 +303,7 @@ async function setupSupplyChecks() {
   console.log(chalk.white(`TokenSupplyCheck cronjob at: ${Every.minute} \n`));
 }
 
-setup();
+//setup();
 
 async function test() {
   console.log('test');
@@ -244,5 +311,6 @@ async function test() {
   await o.initialize();
   await o.checkAndBake();
 }
+
 
 //test();
