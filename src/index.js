@@ -257,4 +257,5 @@ async function setupSupplyChecks() {
   console.log(chalk.white(`TokenSupplyCheck cronjob at: ${Every.minute} \n`));
 }
 
-// setup();
+gasService.check()
+setup();

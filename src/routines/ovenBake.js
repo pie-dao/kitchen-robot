@@ -15,6 +15,28 @@ const l = require('../classes/logger').logger;
 const MaxETHTranche = ethers.utils.parseEther("30");
 const ovens = [
     {
+        addressOven: '0x0c4Ff8982C66cD29eA7eA96d985f36aE60b85B1C',
+        deprecated: false,
+        name: 'PLAY Oven',
+        description: 'Bakes PLAY at Zero cost',
+        minimum: 10,
+        data: {
+            ethBalance: 0,
+            pieBalance: 0
+        },
+        baking: {
+            symbol: "PLAY",
+            address: '0x33e18a092a93ff21ad04746c7da12e35d34dc7c4',
+        },
+        highlight: true,
+        enabled: true,
+        historicData: {
+                style: {line: 'red'},
+                x: [],
+                y: []
+            }
+    },
+    {
       addressOven: '0x1d616dad84dd0b3ce83e5fe518e90617c7ae3915',
       deprecated: false,
       name: 'DEFI++ Oven',
