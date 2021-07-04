@@ -12,7 +12,7 @@ const wallet = require('../wallet').wallet;
 const provider = require('../wallet').provider;
 const l = require('../classes/logger').logger;
 
-const MaxETHTranche = ethers.utils.parseEther("30");
+const MaxETHTranche = ethers.utils.parseEther("10");
 const ovens = [
     {
         addressOven: '0x0c4Ff8982C66cD29eA7eA96d985f36aE60b85B1C',
@@ -20,6 +20,7 @@ const ovens = [
         name: 'PLAY Oven',
         description: 'Bakes PLAY at Zero cost',
         minimum: 10,
+        maxETHtranch: ethers.utils.parseEther("30"),
         data: {
             ethBalance: 0,
             pieBalance: 0
@@ -40,6 +41,7 @@ const ovens = [
       addressOven: '0x1d616dad84dd0b3ce83e5fe518e90617c7ae3915',
       deprecated: false,
       name: 'DEFI++ Oven',
+      maxETHtranch: ethers.utils.parseEther("10"),
       description: 'Bakes DEFI++ at Zero cost',
       minimum: 10,
       data: {
@@ -63,6 +65,7 @@ const ovens = [
       deprecated: false,
       minimum: 10,
       name: 'BCP Oven',
+      maxETHtranch: ethers.utils.parseEther("30"),
       description: 'Bakes BCP at Zero cost',
       data: {
         ethBalance: 0,
@@ -85,6 +88,7 @@ const ovens = [
         deprecated: false,
         minimum: 10,
         name: 'YPIE Oven',
+        maxETHtranch: ethers.utils.parseEther("30"),
         description: 'Bakes YPIE at Zero cost',
         data: {
           ethBalance: 0,
@@ -117,7 +121,7 @@ ovens.forEach(ov => {
     txInProgress[ov.addressOven] = false;
 });
 
-const MAX_GAS = 110000000000;
+const MAX_GAS = 100000000000;
 
 async function checkOven(ov, execute=true) {    
     try {
@@ -126,9 +130,10 @@ async function checkOven(ov, execute=true) {
         ov.historicData.y.push(balance);
 
         if(balance >= ov.minimum) {
-            l.l(`Balance ${ov.name}: ${balance} ETH`);
+            
 
             let gasPrices = await gasNow.fetchGasPrice();
+            l.l(`Balance ${ov.name}: ${balance} ETH - ${gasPrices.fast} gas`);
             const table1 = new Table({ style: { head: [], border: [] } });
             table1.push(['Rapid', 'Fast', 'Standard', 'Timestamp']);
             table1.push([gasPrices.rapid, gasPrices.fast, gasPrices.standard, gasPrices.timestamp]);
@@ -148,7 +153,9 @@ async function checkOven(ov, execute=true) {
                     1, //min_addresses
                     ethers.utils.parseEther("0.1"), // minAmount
                     execute, //execute
-                    ov.baking.symbol
+                    ov.baking.symbol,
+                    false,
+                    ov.maxETHtranch
                 );
             } else {
                 l.l('\n Gas price too high, checking again in a bit.\n')
@@ -198,10 +205,12 @@ async function bake(
     minAmount = ethers.utils.parseEther("0.1"), // Min amount to be considered for baking
     execute = false,
     symbol,
-    verbose = false
+    verbose = false,
+    maxETHtranch = ethers.utils.parseEther("10")
 ) {
     try {
         txInProgress[oven_address] = 'Calculating';
+
         let addresses = []
         let { utils } = ethers;
         let inputAmount = ethers.BigNumber.from("0")
@@ -209,7 +218,14 @@ async function bake(
         let oven = new ethers.Contract(oven_address, ovenABI, wallet);
         const pie_address = await oven.pie();
         const recipe_address = await oven.recipe();
+
+        console.log('recipe_address', recipe_address)
         const recipe = new ethers.Contract(recipe_address, recipeABI, wallet);
+
+        let calculateFor = utils.parseEther("1");
+        let etherJoinAmount = await recipe.calcToPie(pie_address, calculateFor);
+        console.log('etherJoinAmount', etherJoinAmount.toString() );
+        
         
         l.l("\tUsing pie @ " + pie_address);
         l.l("\n~Getting addresses~")
@@ -247,14 +263,16 @@ async function bake(
 
             inputAmount = inputAmount.add(ethers.BigNumber.from(balance))
 
-            if (inputAmount.gt(MaxETHTranche)) {
-                inputAmount = MaxETHTranche;
+            if (inputAmount.gt(maxETHtranch)) {
+                console.log('maxETHtranch reached', maxETHtranch);
+                inputAmount = maxETHtranch;
                 bar1.update(deposits.length);
                 break;
             }
 
             if (addresses.length >= max_addresses) {
                 l.l("\nMax addressess reached, continuing..\n")
+                console.log('Max addressess reached, continuing..');
                 bar1.update(deposits.length);
                 break
             }
@@ -264,16 +282,24 @@ async function bake(
 
         if (addresses.length < min_addresses) {
             l.l(`\nAddressess is less than min_addresses\n`);
+            console.log(`\nAddressess is less than min_addresses\n`);
             return;
         }
 
         l.l("\n~Done getting addresses~\n")
         l.l("Calculating output amount...")
 
-        let calculateFor = utils.parseEther("1");
+        
+        console.log('calculateFor', calculateFor.toString() );
 
-        const etherJoinAmount = await recipe.calcToPie(pie_address, calculateFor);
+        etherJoinAmount = await recipe.calcToPie(pie_address, calculateFor);
+        console.log('etherJoinAmount', etherJoinAmount.toString() );
+
         const outputAmount =  inputAmount.mul(calculateFor).div(etherJoinAmount).div(100).mul(100-slippage);
+        console.log('outputAmount', outputAmount.toString() );
+
+        let realPrice = await recipe.calcToPie(pie_address, outputAmount);
+        console.log('realPrice', realPrice.toString() );
 
         
         l.l("Swapping", inputAmount.toString(), "for", outputAmount.toString())
